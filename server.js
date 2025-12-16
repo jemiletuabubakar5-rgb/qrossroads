@@ -1,4 +1,4 @@
-// server.js - Qrossroads: Where Digital Paths Meet (GREEN ACCENT VERSION)
+// server.js - Qrossroads: Where Digital Paths Meet (GREEN ACCENT VERSION) - FIXED
 const express = require('express');
 const cors = require('cors');
 const QRCode = require('qrcode');
@@ -20,9 +20,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(publicDir));
 
-// ========== YOUR UPDATED HTML WITH GREEN ACCENTS ==========
-const htmlContent = `
-<!DOCTYPE html>
+// ========== FIXED HTML WITH WORKING SCANNER ==========
+const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -775,7 +774,7 @@ const htmlContent = `
             <div id="scan-tab" class="tab-content active">
                 <div class="scanner-container">
                     <div id="video-container">
-                        <video id="video" playsinline></video>
+                        <video id="video" playsinline autoplay muted></video>
                         <div class="scanner-frame"></div>
                     </div>
                     <div class="btn-group">
@@ -842,7 +841,7 @@ const htmlContent = `
     <!-- Include QR Code generation library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
-        // Qrossroads - Where Digital Paths Meet
+        // Qrossroads - Where Digital Paths Meet - FIXED SCANNER VERSION
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ Qrossroads activated successfully!');
             
@@ -850,6 +849,7 @@ const htmlContent = `
             let scannerActive = false;
             let videoStream = null;
             let currentQRCode = null;
+            let scanningInterval = null;
             
             // Tab switching
             const tabs = document.querySelectorAll('.tab');
@@ -899,61 +899,124 @@ const htmlContent = `
                 }
             }
             
-            // Toggle scanner function
+            // Toggle scanner function - FIXED VERSION
             async function toggleScanner() {
                 const video = document.getElementById('video');
                 const scannerBtn = document.getElementById('scanner-btn');
                 
                 if (!scannerActive) {
                     try {
+                        // Request camera access with proper constraints
                         videoStream = await navigator.mediaDevices.getUserMedia({ 
-                            video: { facingMode: 'environment' } 
+                            video: { 
+                                facingMode: 'environment',
+                                width: { ideal: 1280 },
+                                height: { ideal: 720 }
+                            } 
                         });
+                        
+                        // Set video source
                         video.srcObject = videoStream;
+                        
+                        // Wait for video to be ready before playing
+                        await new Promise((resolve) => {
+                            video.onloadedmetadata = () => {
+                                video.play().then(() => {
+                                    console.log('Video is playing');
+                                    resolve();
+                                }).catch(err => {
+                                    console.error('Video play error:', err);
+                                    resolve();
+                                });
+                            };
+                            
+                            // Fallback if onloadedmetadata doesn't fire
+                            setTimeout(resolve, 1000);
+                        });
+                        
+                        // Update UI
                         scannerActive = true;
                         scannerBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Scanner';
-                        scannerBtn.classList.add('accent');
+                        scannerBtn.classList.add('active');
                         document.getElementById('result').innerHTML = '';
-                        scanQRCode();
+                        
+                        // Start QR scanning
+                        startQRScanning();
+                        
+                        showNotification('Scanner activated! Point camera at QR code', 'success');
+                        
                     } catch (error) {
+                        console.error('Camera access error:', error);
                         showNotification('Camera access error: ' + error.message, 'error');
+                        scannerActive = false;
                         scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
-                        scannerBtn.classList.remove('accent');
+                        scannerBtn.classList.remove('active');
                     }
                 } else {
-                    if (videoStream) {
-                        videoStream.getTracks().forEach(track => track.stop());
-                    }
+                    // Stop scanner
                     scannerActive = false;
                     scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
-                    scannerBtn.classList.remove('accent');
+                    scannerBtn.classList.remove('active');
+                    
+                    // Clear scanning interval
+                    if (scanningInterval) {
+                        clearInterval(scanningInterval);
+                        scanningInterval = null;
+                    }
+                    
+                    // Stop video stream
+                    if (videoStream) {
+                        videoStream.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                        videoStream = null;
+                    }
                 }
             }
             
-            // QR Code scanning
-            function scanQRCode() {
+            // Start QR scanning - FIXED VERSION
+            function startQRScanning() {
+                if (!scannerActive) return;
+                
                 const video = document.getElementById('video');
                 const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
+                const context = canvas.getContext('2d', {
+                    willReadFrequently: true // Fixes console warning
+                });
                 
-                function tick() {
-                    if (!scannerActive) return;
+                // Clear any existing interval
+                if (scanningInterval) {
+                    clearInterval(scanningInterval);
+                }
+                
+                // Start scanning loop
+                scanningInterval = setInterval(() => {
+                    if (!scannerActive || !video.videoWidth || !video.videoHeight) return;
                     
-                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                        canvas.height = video.videoHeight;
-                        canvas.width = video.videoWidth;
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    // Set canvas dimensions
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Draw video frame to canvas
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Get image data
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    try {
+                        // Use jsQR to decode
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: 'dontInvert',
+                        });
                         
                         if (code) {
+                            // Found a QR code!
                             handleQRResult(code.data);
+                            // Don't stop scanning - let user decide when to stop
                         }
+                    } catch (error) {
+                        console.error('Scan error:', error);
                     }
-                    requestAnimationFrame(tick);
-                }
-                tick();
+                }, 100); // Scan every 100ms
             }
             
             // Handle QR result
@@ -961,13 +1024,27 @@ const htmlContent = `
                 const resultDiv = document.getElementById('result');
                 
                 try {
+                    // Send to server (or use local fallback)
                     const response = await fetch('/api/scan', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ qrData: data })
                     });
                     
-                    const result = await response.json();
+                    let result;
+                    if (response.ok) {
+                        result = await response.json();
+                    } else {
+                        // Fallback if server is not responding
+                        result = {
+                            success: true,
+                            result: {
+                                data: data,
+                                type: determineQRType(data),
+                                timestamp: new Date().toISOString()
+                            }
+                        };
+                    }
                     
                     if (result.success) {
                         let actions = '';
@@ -976,70 +1053,96 @@ const htmlContent = `
                         
                         // Determine actions based on QR type
                         if (qrType === 'url') {
-                            actions = \`<button class="btn" onclick="window.open('\${qrData}', '_blank')">
-                                <i class="fas fa-external-link-alt"></i> Open Link
-                              </button>\`;
+                            actions = '<button class="btn" onclick="window.open(\\'' + escapeSingleQuotes(qrData) + '\\', \\'_blank\\')"><i class="fas fa-external-link-alt"></i> Open Link</button>';
                         } else if (qrType === 'email') {
-                            actions = \`<button class="btn" onclick="location.href='\${qrData}'">
-                                <i class="fas fa-envelope"></i> Send Email
-                              </button>\`;
+                            actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(qrData) + '\\'"><i class="fas fa-envelope"></i> Send Email</button>';
                         } else if (qrType === 'phone') {
-                            actions = \`<button class="btn" onclick="location.href='\${qrData}'">
-                                <i class="fas fa-phone"></i> Call Number
-                              </button>\`;
+                            actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(qrData) + '\\'"><i class="fas fa-phone"></i> Call Number</button>';
                         } else if (qrType === 'wifi') {
-                            actions = \`<button class="btn" onclick="connectToWifi('\${qrData}')">
-                                <i class="fas fa-wifi"></i> Connect WiFi
-                              </button>\`;
+                            actions = '<button class="btn" onclick="connectToWifi(\\'' + escapeSingleQuotes(qrData) + '\\')"><i class="fas fa-wifi"></i> Connect WiFi</button>';
                         }
                         
-                        resultDiv.innerHTML = \`
-                            <div class="result-header">
-                                <i class="fas fa-check-circle" style="color: #10b981;"></i>
-                                <h3 style="margin: 0;">Digital Path Discovered!</h3>
-                            </div>
-                            <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                    <span class="history-type" style="background: \${getTypeColor(qrType)}">\${qrType.toUpperCase()}</span>
-                                    <span style="color: #6b7280; font-size: 0.9rem;">
-                                        \${new Date().toLocaleTimeString()}
-                                    </span>
-                                </div>
-                                <div style="font-size: 1.1rem; word-break: break-all;">
-                                    \${escapeHtml(qrData)}
-                                </div>
-                            </div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-                                \${actions}
-                                <button class="btn secondary" onclick="copyToClipboard('\${escapeSingleQuotes(qrData)}')">
-                                    <i class="fas fa-copy"></i> Copy
-                                </button>
-                                <button class="btn" onclick="saveToFavorites('\${escapeSingleQuotes(qrData)}', '\${qrType}')">
-                                    <i class="fas fa-star"></i> Save
-                                </button>
-                            </div>
-                        \`;
+                        resultDiv.innerHTML = '<div class="result-header">' +
+                            '<i class="fas fa-check-circle" style="color: #10b981;"></i>' +
+                            '<h3 style="margin: 0;">Digital Path Discovered!</h3>' +
+                            '</div>' +
+                            '<div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">' +
+                            '<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">' +
+                            '<span class="history-type" style="background: ' + getTypeColor(qrType) + '">' + qrType.toUpperCase() + '</span>' +
+                            '<span style="color: #6b7280; font-size: 0.9rem;">' +
+                            new Date().toLocaleTimeString() +
+                            '</span>' +
+                            '</div>' +
+                            '<div style="font-size: 1.1rem; word-break: break-all;">' +
+                            escapeHtml(qrData) +
+                            '</div>' +
+                            '</div>' +
+                            '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">' +
+                            actions +
+                            '<button class="btn" onclick="copyToClipboard(\\'' + escapeSingleQuotes(qrData) + '\\')">' +
+                            '<i class="fas fa-copy"></i> Copy' +
+                            '</button>' +
+                            '<button class="btn" onclick="saveToFavorites(\\'' + escapeSingleQuotes(qrData) + '\\', \\'' + qrType + '\\')">' +
+                            '<i class="fas fa-star"></i> Save' +
+                            '</button>' +
+                            '</div>';
+                        
                         resultDiv.classList.add('show');
                         
-                        if (scannerActive) {
-                            toggleScanner();
-                        }
+                        showNotification('QR code scanned successfully!', 'success');
                         
-                        loadHistory();
-                        showNotification('Digital path scanned successfully!', 'success');
+                        // Auto-save to history
+                        saveToHistory(qrData, qrType);
                     }
                 } catch (error) {
-                    resultDiv.innerHTML = \`
-                        <div class="result-header">
-                            <i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>
-                            <h3 style="margin: 0;">Scan Error</h3>
-                        </div>
-                        <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">
-                            Failed to process QR code: \${error.message}
-                        </div>
-                    \`;
+                    resultDiv.innerHTML = '<div class="result-header">' +
+                        '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>' +
+                        '<h3 style="margin: 0;">Scan Error</h3>' +
+                        '</div>' +
+                        '<div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">' +
+                        'Failed to process QR code: ' + error.message +
+                        '</div>';
                     resultDiv.classList.add('show');
                     showNotification('Scan failed: ' + error.message, 'error');
+                }
+            }
+            
+            // Determine QR code type
+            function determineQRType(data) {
+                if (data.startsWith('http://') || data.startsWith('https://')) {
+                    return 'url';
+                } else if (data.startsWith('mailto:')) {
+                    return 'email';
+                } else if (data.startsWith('tel:')) {
+                    return 'phone';
+                } else if (data.startsWith('WIFI:')) {
+                    return 'wifi';
+                } else if (data.startsWith('BEGIN:VCARD')) {
+                    return 'contact';
+                } else if (data.startsWith('SMSTO:') || data.startsWith('SMS:')) {
+                    return 'sms';
+                }
+                return 'text';
+            }
+            
+            // Save to local history
+            function saveToHistory(data, type) {
+                try {
+                    const history = JSON.parse(localStorage.getItem('qrossroads_history') || '[]');
+                    history.unshift({
+                        id: Date.now(),
+                        data: data,
+                        type: type,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Keep only last 50 items
+                    if (history.length > 50) history.length = 50;
+                    
+                    localStorage.setItem('qrossroads_history', JSON.stringify(history));
+                    loadHistory();
+                } catch (error) {
+                    console.error('Error saving to history:', error);
                 }
             }
             
@@ -1057,13 +1160,15 @@ const htmlContent = `
                     const img = new Image();
                     img.onload = function() {
                         const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
+                        const context = canvas.getContext('2d', {
+                            willReadFrequently: true
+                        });
                         canvas.width = img.width;
                         canvas.height = img.height;
                         context.drawImage(img, 0, 0);
                         
                         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                        const code = jsQR(imageData.data, imageData.width, canvas.height);
+                        const code = jsQR(imageData.data, canvas.width, canvas.height);
                         
                         if (code) {
                             handleQRResult(code.data);
@@ -1085,25 +1190,44 @@ const htmlContent = `
                 }
                 
                 try {
+                    // Use server API for QR generation
                     const response = await fetch('/api/generate', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ text: text, size: 300 })
                     });
                     
-                    const result = await response.json();
+                    let result;
+                    if (response.ok) {
+                        result = await response.json();
+                    } else {
+                        // Fallback to client-side generation
+                        result = await new Promise((resolve, reject) => {
+                            QRCode.toDataURL(text, {
+                                width: 300,
+                                height: 300,
+                                color: {
+                                    dark: '#6d28d9',
+                                    light: '#FFFFFF'
+                                },
+                                margin: 2
+                            }, (err, url) => {
+                                if (err) reject(err);
+                                else resolve({ success: true, qrCode: url, text: text });
+                            });
+                        });
+                    }
                     
                     if (result.success) {
                         const container = document.getElementById('qr-image-container');
-                        container.innerHTML = \`
-                            <div class="qr-preview">
-                                <img src="\${result.qrCode}" alt="Generated QR Code" style="width: 100%; border-radius: 8px;">
-                                <p style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">
-                                    Scan this QR code to access: <br>
-                                    <strong>\${escapeHtml(text.length > 50 ? text.substring(0, 50) + '...' : text)}</strong>
-                                </p>
-                            </div>
-                        \`;
+                        container.innerHTML = '<div class="qr-preview">' +
+                            '<img src="' + result.qrCode + '" alt="Generated QR Code" style="width: 100%; border-radius: 8px;">' +
+                            '<p style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">' +
+                            'Scan this QR code to access: <br>' +
+                            '<strong>' + escapeHtml(text.length > 50 ? text.substring(0, 50) + '...' : text) + '</strong>' +
+                            '</p>' +
+                            '</div>';
+                        
                         document.getElementById('qr-result').classList.add('show');
                         document.getElementById('download-btn').style.display = 'inline-block';
                         document.getElementById('share-btn').style.display = 'inline-block';
@@ -1111,6 +1235,7 @@ const htmlContent = `
                         showNotification('QR code generated successfully!', 'success');
                     }
                 } catch (error) {
+                    console.error('QR generation error:', error);
                     showNotification('Error generating QR code: ' + error.message, 'error');
                 }
             }
@@ -1119,7 +1244,7 @@ const htmlContent = `
             function downloadQR() {
                 if (!currentQRCode) return;
                 const link = document.createElement('a');
-                link.href = currentQRCode.image || currentQRCode;
+                link.href = currentQRCode.image;
                 link.download = 'qrossroads-qr-' + Date.now() + '.png';
                 document.body.appendChild(link);
                 link.click();
@@ -1127,305 +1252,103 @@ const htmlContent = `
                 showNotification('QR code downloaded!', 'success');
             }
             
-            // Share QR Code - COMPLETE WORKING VERSION
+            // Share QR Code
             async function shareQR() {
                 if (!currentQRCode) return;
                 
                 try {
-                    // Get the QR code image and text
-                    const qrImage = document.querySelector('#qr-image-container img');
                     const qrText = document.getElementById('qr-text').value.trim();
-                    
-                    if (!qrImage) {
-                        showNotification('QR code not found', 'error');
-                        return;
-                    }
-                    
-                    // Create share text
                     let shareText = 'QR Code generated with Qrossroads';
                     if (qrText) {
                         shareText = 'QR Code: ' + qrText.substring(0, 100) + (qrText.length > 100 ? '...' : '');
                     }
                     
                     // Check if Web Share API is available
-                    if (navigator.share && navigator.canShare) {
+                    if (navigator.share) {
                         try {
-                            // Convert data URL to blob for sharing
-                            const response = await fetch(currentQRCode.image || currentQRCode);
+                            const response = await fetch(currentQRCode.image);
                             const blob = await response.blob();
-                            
-                            // Create a file from blob
                             const file = new File([blob], 'qrossroads-qr.png', { type: 'image/png' });
                             
-                            // Check if file can be shared
-                            const shareData = {
+                            await navigator.share({
                                 title: 'QR Code from Qrossroads',
                                 text: shareText,
                                 files: [file]
-                            };
-                            
-                            if (navigator.canShare && navigator.canShare(shareData)) {
-                                await navigator.share(shareData);
-                                showNotification('QR code shared successfully!', 'success');
-                                return;
-                            }
-                        } catch (shareError) {
-                            console.log('File sharing failed, trying URL sharing:', shareError);
-                        }
-                        
-                        // Fallback to URL sharing if file sharing fails
-                        try {
-                            await navigator.share({
-                                title: 'QR Code from Qrossroads',
-                                text: shareText + '\\n\\nGenerated with Qrossroads - Where Digital Paths Meet',
-                                url: window.location.href
                             });
-                            showNotification('App link shared!', 'success');
+                            showNotification('QR code shared successfully!', 'success');
                             return;
-                        } catch (urlShareError) {
-                            console.log('URL sharing failed:', urlShareError);
+                        } catch (shareError) {
+                            console.log('File sharing failed:', shareError);
                         }
                     }
                     
-                    // Fallback for browsers without Web Share API or when sharing fails
-                    showShareOptions(qrImage.src, qrText);
+                    // Fallback: download
+                    downloadQR();
                     
                 } catch (error) {
                     console.error('Share error:', error);
-                    showNotification('Sharing failed. Download the QR code instead.', 'error');
-                    downloadQR(); // Fallback to download
+                    showNotification('Sharing failed. Downloading instead.', 'error');
+                    downloadQR();
                 }
-            }
-            
-            // Show custom share options modal
-            function showShareOptions(qrImageSrc, qrText) {
-                // Create share modal
-                const shareModal = document.createElement('div');
-                shareModal.style.cssText = \`
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0,0,0,0.7);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 10000;
-                    animation: fadeIn 0.3s ease;
-                \`;
-                
-                shareModal.innerHTML = \`
-                    <div style="
-                        background: white;
-                        border-radius: 20px;
-                        padding: 30px;
-                        max-width: 500px;
-                        width: 90%;
-                        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                        text-align: center;
-                    ">
-                        <div style="margin-bottom: 20px;">
-                            <h3 style="color: #6d28d9; margin-bottom: 10px;">Share QR Code</h3>
-                            <p style="color: #6b7280;">Choose how you want to share the QR code</p>
-                        </div>
-                        
-                        <div style="
-                            background: #f9fafb;
-                            border-radius: 12px;
-                            padding: 15px;
-                            margin: 20px 0;
-                            border: 1px solid #e5e7eb;
-                        ">
-                            <img src="\${qrImageSrc}" 
-                                 alt="QR Code" 
-                                 style="width: 150px; height: 150px; border-radius: 8px; margin-bottom: 10px;">
-                            <p style="color: #6b7280; font-size: 0.9rem; margin: 0;">
-                                \${qrText ? 'Scan to access: <strong>' + qrText.substring(0, 60) + (qrText.length > 60 ? '...' : '') + '</strong>' : 'Generated QR Code'}
-                            </p>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0;">
-                            <button class="share-option-btn" data-action="download">
-                                <i class="fas fa-download"></i>
-                                <span>Download</span>
-                            </button>
-                            <button class="share-option-btn" data-action="copy-image">
-                                <i class="fas fa-copy"></i>
-                                <span>Copy Image</span>
-                            </button>
-                            <button class="share-option-btn" data-action="copy-link">
-                                <i class="fas fa-link"></i>
-                                <span>Copy Link</span>
-                            </button>
-                            <button class="share-option-btn" data-action="copy-text">
-                                <i class="fas fa-text"></i>
-                                <span>Copy Text</span>
-                            </button>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px; margin-top: 20px;">
-                            <button id="cancel-share" style="
-                                flex: 1;
-                                padding: 12px;
-                                background: #f1f5f9;
-                                color: #64748b;
-                                border: none;
-                                border-radius: 10px;
-                                font-weight: 600;
-                                cursor: pointer;
-                            ">Cancel</button>
-                        </div>
-                    </div>
-                \`;
-                
-                // Add styles for share buttons
-                const style = document.createElement('style');
-                style.textContent = \`
-                    .share-option-btn {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        gap: 8px;
-                        padding: 15px;
-                        background: white;
-                        border: 2px solid #e5e7eb;
-                        border-radius: 12px;
-                        color: #6d28d9;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.3s;
-                    }
-                    .share-option-btn:hover {
-                        background: #f8fafc;
-                        border-color: #6d28d9;
-                        transform: translateY(-2px);
-                    }
-                    .share-option-btn i {
-                        font-size: 24px;
-                        margin-bottom: 5px;
-                    }
-                \`;
-                document.head.appendChild(style);
-                
-                document.body.appendChild(shareModal);
-                
-                // Handle share options
-                shareModal.querySelectorAll('.share-option-btn').forEach(btn => {
-                    btn.addEventListener('click', async function() {
-                        const action = this.getAttribute('data-action');
-                        
-                        switch(action) {
-                            case 'download':
-                                downloadQR();
-                                showNotification('QR code downloaded!', 'success');
-                                break;
-                                
-                            case 'copy-image':
-                                try {
-                                    // Convert data URL to blob
-                                    const response = await fetch(qrImageSrc);
-                                    const blob = await response.blob();
-                                    
-                                    // Copy image to clipboard
-                                    const item = new ClipboardItem({ 'image/png': blob });
-                                    await navigator.clipboard.write([item]);
-                                    showNotification('QR code image copied to clipboard!', 'success');
-                                } catch (error) {
-                                    console.error('Copy image error:', error);
-                                    showNotification('Could not copy image. Download instead.', 'error');
-                                    downloadQR();
-                                }
-                                break;
-                                
-                            case 'copy-link':
-                                if (qrText && (qrText.startsWith('http://') || qrText.startsWith('https://'))) {
-                                    await navigator.clipboard.writeText(qrText);
-                                    showNotification('Link copied to clipboard!', 'success');
-                                } else {
-                                    await navigator.clipboard.writeText(qrText || 'QR Code generated with Qrossroads');
-                                    showNotification('Text copied to clipboard!', 'success');
-                                }
-                                break;
-                                
-                            case 'copy-text':
-                                await navigator.clipboard.writeText(qrText || 'QR Code generated with Qrossroads');
-                                showNotification('Text copied to clipboard!', 'success');
-                                break;
-                        }
-                        
-                        // Close modal after action
-                        document.body.removeChild(shareModal);
-                        document.head.removeChild(style);
-                    });
-                });
-                
-                // Close modal on cancel
-                shareModal.querySelector('#cancel-share').addEventListener('click', function() {
-                    document.body.removeChild(shareModal);
-                    document.head.removeChild(style);
-                });
-                
-                // Close modal on background click
-                shareModal.addEventListener('click', function(e) {
-                    if (e.target === this) {
-                        document.body.removeChild(shareModal);
-                        document.head.removeChild(style);
-                    }
-                });
-            }
-            
-            // Add CSS for animations if not already present
-            const animationStyle = document.createElement('style');
-            animationStyle.textContent = \`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-            \`;
-            if (!document.querySelector('style[data-share-animations]')) {
-                animationStyle.setAttribute('data-share-animations', 'true');
-                document.head.appendChild(animationStyle);
             }
             
             // History functions
             async function loadHistory() {
                 try {
-                    const response = await fetch('/api/history');
-                    const result = await response.json();
+                    // Try server first, fallback to localStorage
+                    let history = [];
+                    
+                    try {
+                        const response = await fetch('/api/history');
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (result.success) {
+                                history = result.history;
+                            }
+                        }
+                    } catch (serverError) {
+                        console.log('Using localStorage for history:', serverError);
+                        history = JSON.parse(localStorage.getItem('qrossroads_history') || '[]');
+                    }
                     
                     const historyList = document.getElementById('history-list');
                     
-                    if (!result.success || result.history.length === 0) {
-                        historyList.innerHTML = \`
-                            <div style="text-align: center; padding: 40px; color: #6b7280;">
-                                <i class="fas fa-road fa-3x" style="margin-bottom: 20px; opacity: 0.5;"></i>
-                                <h4>No Digital Paths Yet</h4>
-                                <p>Start scanning QR codes to build your digital path history.</p>
-                            </div>
-                        \`;
+                    if (history.length === 0) {
+                        historyList.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">' +
+                            '<i class="fas fa-road fa-3x" style="margin-bottom: 20px; opacity: 0.5;"></i>' +
+                            '<h4>No Digital Paths Yet</h4>' +
+                            '<p>Start scanning QR codes to build your digital path history.</p>' +
+                            '</div>';
                         return;
                     }
                     
-                    historyList.innerHTML = result.history.map(item => \`
-                        <div class="history-item">
-                            <div style="flex: 1;">
-                                <div>
-                                    <span class="history-type" style="background: \${getTypeColor(item.type)}">\${item.type.toUpperCase()}</span>
-                                    <strong>\${escapeHtml(item.data.length > 60 ? item.data.substring(0, 60) + '...' : item.data)}</strong>
-                                </div>
-                                <div class="history-time">
-                                    \${new Date(item.timestamp).toLocaleString()}
-                                </div>
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn" style="padding: 8px 16px; font-size: 0.9rem;" 
-                                        onclick="copyToClipboard('\${escapeSingleQuotes(item.data)}')">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                        </div>
-                    \`).join('');
+                    let historyHTML = '';
+                    history.forEach(item => {
+                        historyHTML += '<div class="history-item">' +
+                            '<div style="flex: 1;">' +
+                            '<div>' +
+                            '<span class="history-type" style="background: ' + getTypeColor(item.type) + '">' + item.type.toUpperCase() + '</span>' +
+                            '<strong>' + escapeHtml(item.data.length > 60 ? item.data.substring(0, 60) + '...' : item.data) + '</strong>' +
+                            '</div>' +
+                            '<div class="history-time">' +
+                            '<i class="far fa-clock"></i>' +
+                            new Date(item.timestamp).toLocaleString() +
+                            '</div>' +
+                            '</div>' +
+                            '<div style="display: flex; gap: 8px;">' +
+                            '<button class="btn" style="padding: 8px 16px; font-size: 0.9rem;" ' +
+                            'onclick="copyToClipboard(\\'' + escapeSingleQuotes(item.data) + '\\')">' +
+                            '<i class="fas fa-copy"></i>' +
+                            '</button>' +
+                            '<button class="btn" style="padding: 8px 16px; font-size: 0.9rem;" ' +
+                            'onclick="rescanItem(\\'' + escapeSingleQuotes(item.data) + '\\')">' +
+                            '<i class="fas fa-redo"></i>' +
+                            '</button>' +
+                            '</div>' +
+                            '</div>';
+                    });
+                    
+                    historyList.innerHTML = historyHTML;
                 } catch (error) {
                     console.error('Error loading history:', error);
                 }
@@ -1435,13 +1358,16 @@ const htmlContent = `
                 if (!confirm('Clear all your digital paths? This action cannot be undone.')) return;
                 
                 try {
-                    const response = await fetch('/api/history', { method: 'DELETE' });
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        loadHistory();
-                        showNotification('All digital paths cleared!', 'success');
+                    // Clear both server and localStorage
+                    try {
+                        await fetch('/api/history', { method: 'DELETE' });
+                    } catch (e) {
+                        console.log('Server clear failed, using localStorage only');
                     }
+                    
+                    localStorage.removeItem('qrossroads_history');
+                    loadHistory();
+                    showNotification('All digital paths cleared!', 'success');
                 } catch (error) {
                     showNotification('Error clearing history: ' + error.message, 'error');
                 }
@@ -1449,26 +1375,28 @@ const htmlContent = `
             
             async function exportHistory() {
                 try {
-                    const response = await fetch('/api/history');
-                    const result = await response.json();
+                    let history = JSON.parse(localStorage.getItem('qrossroads_history') || '[]');
                     
-                    if (result.success) {
-                        const csv = result.history.map(item => 
-                            \`"\${item.timestamp}","\${item.type}","\${item.data.replace(/"/g, '""')}"\`
-                        ).join('\\n');
-                        
-                        const blob = new Blob(['timestamp,type,data\\n' + csv], { type: 'text/csv' });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'qrossroads-digital-paths-' + new Date().toISOString().split('T')[0] + '.csv';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                        
-                        showNotification('Digital paths exported as CSV!', 'success');
+                    if (history.length === 0) {
+                        showNotification('No history to export', 'warning');
+                        return;
                     }
+                    
+                    const csv = history.map(item => 
+                        '"' + item.timestamp + '","' + item.type + '","' + item.data.replace(/"/g, '""') + '"'
+                    ).join('\\n');
+                    
+                    const blob = new Blob(['timestamp,type,data\\n' + csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'qrossroads-digital-paths-' + new Date().toISOString().split('T')[0] + '.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    showNotification('Digital paths exported as CSV!', 'success');
                 } catch (error) {
                     showNotification('Export failed: ' + error.message, 'error');
                 }
@@ -1484,14 +1412,15 @@ const htmlContent = `
             function showNotification(message, type = 'info') {
                 // Create notification element
                 const notification = document.createElement('div');
-                notification.innerHTML = \`
-                    <div style="position: fixed; top: 20px; right: 20px; background: \${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#6d28d9'}; color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; animation: fadeInUp 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <i class="fas \${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'}"></i>
-                            <span>\${message}</span>
-                        </div>
-                    </div>
-                \`;
+                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: ' + 
+                    (type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#6d28d9') + 
+                    '; color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; animation: fadeInUp 0.3s ease;';
+                
+                notification.innerHTML = '<div style="display: flex; align-items: center; gap: 10px;">' +
+                    '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle') + '"></i>' +
+                    '<span>' + message + '</span>' +
+                    '</div>';
+                
                 document.body.appendChild(notification);
                 
                 // Remove after 3 seconds
@@ -1529,7 +1458,19 @@ const htmlContent = `
             }
             
             function saveToFavorites(data, type) {
-                showNotification('Added to favorites!', 'success');
+                try {
+                    const favorites = JSON.parse(localStorage.getItem('qrossroads_favorites') || '[]');
+                    favorites.unshift({
+                        id: Date.now(),
+                        data: data,
+                        type: type,
+                        timestamp: new Date().toISOString()
+                    });
+                    localStorage.setItem('qrossroads_favorites', JSON.stringify(favorites));
+                    showNotification('Added to favorites!', 'success');
+                } catch (error) {
+                    showNotification('Error saving to favorites', 'error');
+                }
             }
             
             function rescanItem(data) {
@@ -1551,24 +1492,15 @@ const htmlContent = `
             window.connectToWifi = connectToWifi;
             window.rescanItem = rescanItem;
             
-            // Add fadeOut animation
+            // Add animation styles
             const style = document.createElement('style');
-            style.textContent = \`
-                @keyframes fadeOut {
-                    from { opacity: 1; transform: translateY(0); }
-                    to { opacity: 0; transform: translateY(-10px); }
-                }
-                @keyframes fadeInUp {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-            \`;
+            style.textContent = '@keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } } ' +
+                               '@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }';
             document.head.appendChild(style);
         });
     </script>
 </body>
-</html>
-`;
+</html>`;
 
 // Save HTML to public folder
 fs.writeFileSync(path.join(publicDir, 'index.html'), htmlContent);
