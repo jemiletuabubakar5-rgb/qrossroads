@@ -1,912 +1,6 @@
-// server.js - Qrossroads: COMPLETELY FIXED SCANNER VERSION
-const express = require('express');
-const cors = require('cors');
-const QRCode = require('qrcode');
-const path = require('path');
-const fs = require('fs');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Create public directory if it doesn't exist
-const publicDir = path.join(__dirname, 'public');
-if (!fs.existsSync(publicDir)) {
-    fs.mkdirSync(publicDir);
-    console.log('🗂️ Created public directory');
-}
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(publicDir));
-
-// ========== COMPLETE FIXED HTML ==========
-const htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Qrossroads | Where Digital Paths Meet</title>
-    <meta name="description" content="Qrossroads - Professional QR Code Hub: Scan, generate, and manage all your digital connections in one place.">
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-        /* Qrossroads Theme Colors - Enhanced with Green */
-        :root {
-            --primary: #6d28d9;
-            --primary-dark: #5b21b6;
-            --secondary: #10b981;
-            --accent: #f59e0b;
-            --dark: #1f2937;
-            --light: #f9fafb;
-            --gray: #6b7280;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
-            min-height: 100vh;
-            color: var(--dark);
-            line-height: 1.5;
-            position: relative;
-            overflow-x: hidden;
-        }
-
-        /* Green accent overlay from right */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 40%;
-            height: 100%;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(16, 185, 129, 0.08) 20%,
-                rgba(16, 185, 129, 0.15) 50%,
-                rgba(16, 185, 129, 0.08) 80%,
-                transparent 100%);
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        /* Subtle green particles animation */
-        body::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 40%;
-            height: 100%;
-            background-image: 
-                radial-gradient(circle at 90% 20%, rgba(16, 185, 129, 0.1) 2px, transparent 3px),
-                radial-gradient(circle at 95% 40%, rgba(16, 185, 129, 0.08) 1px, transparent 2px),
-                radial-gradient(circle at 85% 60%, rgba(16, 185, 129, 0.12) 3px, transparent 4px),
-                radial-gradient(circle at 92% 80%, rgba(16, 185, 129, 0.06) 2px, transparent 3px);
-            background-size: 100px 100px;
-            z-index: -1;
-            pointer-events: none;
-            animation: floatParticles 20s linear infinite;
-        }
-
-        @keyframes floatParticles {
-            0% { transform: translateY(0); }
-            100% { transform: translateY(-100px); }
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            position: relative;
-        }
-
-        /* ========== ENHANCED LOGO WITH GREEN ACCENT ========== */
-        .logo-container {
-            text-align: center;
-            padding: 30px 20px;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        /* Green accent behind logo */
-        .logo-container::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            right: 10%;
-            transform: translateY(-50%);
-            width: 120px;
-            height: 120px;
-            background: linear-gradient(135deg, 
-                rgba(16, 185, 129, 0.2) 0%, 
-                rgba(16, 185, 129, 0.1) 50%, 
-                transparent 100%);
-            border-radius: 30px;
-            z-index: 0;
-            filter: blur(20px);
-        }
-
-        .logo-symbol {
-            width: 80px;
-            height: 80px;
-            background: white;
-            border-radius: 20px;
-            margin: 0 auto 20px;
-            position: relative;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transform: rotate(45deg);
-            transition: transform 0.3s ease;
-            z-index: 1;
-        }
-
-        .logo-symbol:hover {
-            transform: rotate(45deg) scale(1.05);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
-        }
-
-        .logo-symbol::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(0deg);
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--primary);
-            border-radius: 8px;
-        }
-
-        .logo-symbol::after {
-            content: '+';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 28px;
-            font-weight: 900;
-            color: var(--primary);
-        }
-
-        /* Green accent dot on logo */
-        .logo-symbol .green-dot {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 12px;
-            height: 12px;
-            background: var(--secondary);
-            border-radius: 50%;
-            animation: pulseGreen 2s ease-in-out infinite;
-        }
-
-        @keyframes pulseGreen {
-            0%, 100% { 
-                transform: scale(1);
-                opacity: 0.8;
-                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-            }
-            50% { 
-                transform: scale(1.2);
-                opacity: 1;
-                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-            }
-        }
-
-        .logo-text {
-            text-align: center;
-            position: relative;
-            z-index: 1;
-        }
-
-        .logo-name {
-            font-size: 3.5rem;
-            font-weight: 800;
-            color: white;
-            margin-bottom: 8px;
-            letter-spacing: -0.5px;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
-
-        .logo-tagline {
-            font-size: 1.1rem;
-            font-weight: 400;
-            color: rgba(255,255,255,0.9);
-            letter-spacing: 1px;
-            position: relative;
-            display: inline-block;
-            padding-bottom: 10px;
-        }
-
-        /* Green underline for tagline */
-        .logo-tagline::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                var(--secondary) 50%, 
-                transparent 100%);
-            border-radius: 2px;
-        }
-
-        .logo-subtitle {
-            font-size: 1rem;
-            color: rgba(255,255,255,0.8);
-            margin-top: 15px;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.4;
-            position: relative;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            border-left: 3px solid var(--secondary);
-        }
-        /* ========== END LOGO ========== */
-
-        .app-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-            margin-bottom: 30px;
-            position: relative;
-        }
-
-        /* Green accent corner on card */
-        .app-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, 
-                rgba(16, 185, 129, 0.15) 0%, 
-                transparent 50%);
-            border-radius: 0 20px 0 0;
-            z-index: 0;
-        }
-
-        .tabs {
-            display: flex;
-            background: var(--light);
-            border-bottom: 1px solid #e5e7eb;
-            position: relative;
-            z-index: 1;
-        }
-
-        .tab {
-            flex: 1;
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.3s;
-            border-bottom: 3px solid transparent;
-            color: var(--gray);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            position: relative;
-        }
-
-        .tab:hover {
-            background: rgba(109, 40, 217, 0.05);
-            color: var(--primary);
-        }
-
-        .tab.active {
-            background: white;
-            border-bottom: 3px solid var(--primary);
-            color: var(--primary);
-        }
-
-        /* Green indicator for active tab */
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            right: 15px;
-            transform: translateY(-50%);
-            width: 6px;
-            height: 6px;
-            background: var(--secondary);
-            border-radius: 50%;
-            animation: blink 1.5s ease-in-out infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        .tab-content {
-            display: none;
-            padding: 30px;
-        }
-
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .scanner-container {
-            text-align: center;
-        }
-
-        #video-container {
-            width: 100%;
-            max-width: 500px;
-            height: 300px;
-            margin: 0 auto 20px;
-            background: #000;
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
-            border: 2px solid rgba(255,255,255,0.1);
-            box-shadow: 
-                0 15px 35px rgba(0,0,0,0.3),
-                inset 0 0 0 1px rgba(255,255,255,0.05);
-        }
-
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .scanner-frame {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
-            border: 3px solid var(--secondary);
-            border-radius: 10px;
-            box-shadow: 
-                0 0 0 5000px rgba(0, 0, 0, 0.6),
-                0 0 20px rgba(16, 185, 129, 0.4);
-            pointer-events: none;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { 
-                border-color: var(--secondary);
-                box-shadow: 
-                    0 0 0 5000px rgba(0, 0, 0, 0.6),
-                    0 0 20px rgba(16, 185, 129, 0.4);
-            }
-            50% { 
-                border-color: #34d399;
-                box-shadow: 
-                    0 0 0 5000px rgba(0, 0, 0, 0.6),
-                    0 0 30px rgba(52, 211, 153, 0.6);
-            }
-        }
-
-        .btn-group {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin: 25px 0;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 50px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(109, 40, 217, 0.4);
-            background: linear-gradient(135deg, var(--primary-dark) 0%, #4c1d95 100%);
-        }
-
-        /* Green accent on button hover */
-        .btn:hover::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 30px;
-            height: 100%;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(16, 185, 129, 0.2) 100%);
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, var(--dark) 0%, #374151 100%);
-            box-shadow: 0 4px 12px rgba(31, 41, 55, 0.3);
-        }
-
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-            box-shadow: 0 8px 20px rgba(31, 41, 55, 0.4);
-        }
-
-        .btn-secondary:hover::after {
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(16, 185, 129, 0.15) 100%);
-        }
-
-        .result-box {
-            background: var(--light);
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            display: none;
-            border: 1px solid #e5e7eb;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Green accent stripe on result box */
-        .result-box::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(to bottom, 
-                var(--secondary) 0%, 
-                #34d399 100%);
-        }
-
-        .result-box.show {
-            display: block;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { 
-                opacity: 0; 
-                transform: translateY(10px) translateX(10px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0) translateX(0); 
-            }
-        }
-        
-        .result-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            color: var(--primary);
-        }
-
-        .history-item {
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s;
-            position: relative;
-        }
-        
-        .history-item:hover {
-            background: rgba(109, 40, 217, 0.03);
-            padding-left: 20px;
-        }
-
-        /* Green indicator for history items */
-        .history-item::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 0;
-            background: var(--secondary);
-            border-radius: 0 2px 2px 0;
-            transition: height 0.3s ease;
-        }
-
-        .history-item:hover::before {
-            height: 60%;
-        }
-
-        .history-item:last-child {
-            border-bottom: none;
-        }
-        
-        .history-type {
-            display: inline-block;
-            padding: 4px 12px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-right: 10px;
-        }
-        
-        .history-time {
-            color: var(--gray);
-            font-size: 0.9rem;
-            margin-top: 5px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .qr-preview {
-            max-width: 200px;
-            margin: 20px auto;
-            padding: 15px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            position: relative;
-            border: 1px solid #e5e7eb;
-        }
-
-        /* Green corner on QR preview */
-        .qr-preview::after {
-            content: '';
-            position: absolute;
-            top: -1px;
-            right: -1px;
-            width: 15px;
-            height: 15px;
-            background: linear-gradient(135deg, 
-                var(--secondary) 0%, 
-                transparent 50%);
-            border-radius: 0 12px 0 0;
-        }
-        
-        textarea {
-            width: 100%;
-            height: 100px;
-            padding: 15px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-size: 1rem;
-            margin-bottom: 20px;
-            resize: vertical;
-            font-family: inherit;
-            transition: all 0.3s;
-        }
-        
-        textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1);
-        }
-
-        /* Green accent on textarea focus */
-        textarea:focus {
-            border-right-color: var(--secondary);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
-            /* Hide green overlay on mobile for cleaner look */
-            body::before,
-            body::after {
-                opacity: 0.5;
-            }
-            
-            .logo-container {
-                padding: 20px 15px;
-            }
-            
-            .logo-container::before {
-                display: none;
-            }
-            
-            .logo-symbol {
-                width: 60px;
-                height: 60px;
-                margin-bottom: 15px;
-            }
-            
-            .logo-symbol::before {
-                width: 30px;
-                height: 30px;
-                border-width: 3px;
-            }
-            
-            .logo-symbol::after {
-                font-size: 20px;
-            }
-            
-            .logo-symbol .green-dot {
-                width: 8px;
-                height: 8px;
-            }
-            
-            .logo-name {
-                font-size: 2.5rem;
-            }
-            
-            .logo-tagline {
-                font-size: 1rem;
-                letter-spacing: 0.5px;
-            }
-            
-            .logo-subtitle {
-                font-size: 0.9rem;
-                padding: 10px;
-                border-left-width: 2px;
-            }
-            
-            .tab-content {
-                padding: 20px;
-            }
-            
-            .tabs {
-                flex-direction: column;
-            }
-            
-            .tab {
-                padding: 15px;
-            }
-            
-            .tab.active::after {
-                right: 10px;
-            }
-            
-            #video-container {
-                height: 250px;
-            }
-            
-            .scanner-frame {
-                width: 180px;
-                height: 180px;
-            }
-            
-            .btn {
-                padding: 12px 24px;
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .btn-group {
-                flex-direction: column;
-                align-items: stretch;
-            }
-        }
-
-        .footer {
-            text-align: center;
-            color: rgba(255,255,255,0.8);
-            padding: 30px 0;
-            position: relative;
-        }
-        
-        /* Green accent in footer */
-        .footer::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 10%;
-            width: 60px;
-            height: 2px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                var(--secondary) 50%, 
-                transparent 100%);
-        }
-        
-        .copyright {
-            margin-top: 10px;
-            opacity: 0.7;
-            font-size: 0.9rem;
-        }
-        
-        /* Scanner status indicator */
-        .scanner-status {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin: 15px 0;
-            padding: 10px;
-            background: rgba(16, 185, 129, 0.1);
-            border-radius: 8px;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-        }
-        
-        .scanner-status.active {
-            background: rgba(16, 185, 129, 0.2);
-        }
-        
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #ef4444;
-            animation: pulseRed 1.5s infinite;
-        }
-        
-        .status-dot.active {
-            background: #10b981;
-            animation: pulseGreenFast 1s infinite;
-        }
-        
-        @keyframes pulseRed {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        
-        @keyframes pulseGreenFast {
-            0%, 100% { 
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-            }
-            50% { 
-                transform: scale(1.2);
-                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- ========== ENHANCED LOGO WITH GREEN ACCENTS ========== -->
-        <div class="logo-container">
-            <div class="logo-symbol">
-                <div class="green-dot"></div>
-            </div>
-            <div class="logo-text">
-                <h1 class="logo-name">QROSSROADS</h1>
-                <div class="logo-tagline">WHERE DIGITAL PATHS MEET</div>
-                <p class="logo-subtitle">Professional QR Code Scanner & Generator</p>
-            </div>
-        </div>
-        <!-- ========== END LOGO ========== -->
-
-        <div class="app-card">
-            <div class="tabs">
-                <div class="tab active" data-tab="scan">
-                    <i class="fas fa-crosshairs"></i> Scan
-                </div>
-                <div class="tab" data-tab="generate">
-                    <i class="fas fa-bolt"></i> Generate
-                </div>
-                <div class="tab" data-tab="history">
-                    <i class="fas fa-road"></i> Paths
-                </div>
-            </div>
-
-            <div id="scan-tab" class="tab-content active">
-                <div class="scanner-container">
-                    <!-- Scanner Status Indicator -->
-                    <div id="scanner-status" class="scanner-status">
-                        <div class="status-dot"></div>
-                        <span>Scanner is stopped</span>
-                    </div>
-                    
-                    <div id="video-container">
-                        <video id="video" playsinline autoplay muted></video>
-                        <div class="scanner-frame"></div>
-                    </div>
-                    
-                    <div class="btn-group">
-                        <button class="btn" id="scanner-btn">
-                            <i class="fas fa-camera"></i> Start Scanner
-                        </button>
-                        <button class="btn btn-secondary" id="upload-btn">
-                            <i class="fas fa-upload"></i> Upload Image
-                        </button>
-                    </div>
-                    
-                    <input type="file" id="file-input" accept="image/*" style="display: none;">
-                    
-                    <!-- Results Area -->
-                    <div id="result" class="result-box"></div>
-                    
-                    <!-- Debug Info (hidden by default) -->
-                    <div id="debug-info" style="display: none; margin-top: 20px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 0.9rem; color: #6b7280;">
-                        <p><strong>Debug Info:</strong></p>
-                        <p id="debug-status">Scanner: Inactive</p>
-                        <p id="debug-video">Video: Not loaded</p>
-                    </div>
-                </div>
-            </div>
-
-            <div id="generate-tab" class="tab-content">
-                <div style="text-align: center;">
-                    <textarea id="qr-text" placeholder="Enter text, URL, contact info, or any content..."></textarea>
-                    <div class="btn-group">
-                        <button class="btn" id="generate-btn">
-                            <i class="fas fa-qrcode"></i> Generate QR Code
-                        </button>
-                    </div>
-                    <div id="qr-result" class="result-box">
-                        <div id="qr-image-container"></div>
-                        <div class="btn-group">
-                            <button class="btn btn-secondary" id="download-btn" style="display: none;">
-                                <i class="fas fa-download"></i> Download
-                            </button>
-                            <button class="btn" id="share-btn" style="display: none;">
-                                <i class="fas fa-share"></i> Share
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="history-tab" class="tab-content">
-                <div class="result-header">
-                    <i class="fas fa-road"></i>
-                    <h3 style="margin: 0;">Digital Paths</h3>
-                </div>
-                <div id="history-list"></div>
-                <div class="btn-group" style="margin-top: 30px;">
-                    <button class="btn btn-secondary" id="clear-history-btn">
-                        <i class="fas fa-trash"></i> Clear All
-                    </button>
-                    <button class="btn" id="export-btn">
-                        <i class="fas fa-file-export"></i> Export
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p><strong>Qrossroads</strong> - Professional QR Code Hub</p>
-            <p class="copyright">© 2024 Qrossroads | Where Digital Paths Meet</p>
-        </div>
-    </div>
-
-    <!-- Include QR Code scanning library -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <!-- Include QR Code generation library -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-
     <script>
         // Qrossroads - COMPLETELY FIXED SCANNER VERSION
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('⚡ Qrossroads activated successfully!');
             
             // Initialize variables
             let scannerActive = false;
@@ -994,12 +88,10 @@ const htmlContent = `<!DOCTYPE html>
             
             // Toggle scanner function - FIXED VERSION
             async function toggleScanner() {
-                console.log('Toggle scanner called, current state:', scannerActive);
                 
                 if (!scannerActive) {
                     // START SCANNER
                     try {
-                        console.log('Requesting camera access...');
                         
                         // Request camera access
                         videoStream = await navigator.mediaDevices.getUserMedia({ 
@@ -1007,8 +99,6 @@ const htmlContent = `<!DOCTYPE html>
                                 facingMode: 'environment'
                             } 
                         });
-                        
-                        console.log('Camera access granted');
                         
                         // Set video source
                         video.srcObject = videoStream;
@@ -1018,7 +108,6 @@ const htmlContent = `<!DOCTYPE html>
                             let resolved = false;
                             
                             video.onloadedmetadata = () => {
-                                console.log('Video metadata loaded');
                                 if (!resolved) {
                                     resolved = true;
                                     resolve();
@@ -1026,7 +115,6 @@ const htmlContent = `<!DOCTYPE html>
                             };
                             
                             video.onerror = (error) => {
-                                console.error('Video error:', error);
                                 if (!resolved) {
                                     resolved = true;
                                     reject(new Error('Video failed to load'));
@@ -1036,7 +124,6 @@ const htmlContent = `<!DOCTYPE html>
                             // Fallback timeout
                             setTimeout(() => {
                                 if (!resolved) {
-                                    console.log('Video load timeout');
                                     resolved = true;
                                     resolve();
                                 }
@@ -1046,9 +133,7 @@ const htmlContent = `<!DOCTYPE html>
                         // Try to play video
                         try {
                             await video.play();
-                            console.log('Video playing successfully');
                         } catch (playError) {
-                            console.warn('Video play error:', playError);
                             // Continue anyway
                         }
                         
@@ -1064,14 +149,12 @@ const htmlContent = `<!DOCTYPE html>
                         setTimeout(() => {
                             if (scannerActive) {
                                 startQRScanning();
-                                console.log('QR scanning started');
                             }
                         }, 500);
                         
                         showNotification('Scanner activated! Point camera at QR code', 'success');
                         
                     } catch (error) {
-                        console.error('Camera access error:', error);
                         showNotification('Camera error: ' + error.message, 'error');
                         scannerActive = false;
                         scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
@@ -1079,7 +162,6 @@ const htmlContent = `<!DOCTYPE html>
                     }
                 } else {
                     // STOP SCANNER
-                    console.log('Stopping scanner...');
                     
                     scannerActive = false;
                     scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
@@ -1087,23 +169,19 @@ const htmlContent = `<!DOCTYPE html>
                     
                     // Clear scanning interval
                     if (scanningInterval) {
-                        console.log('Clearing scanning interval');
                         clearInterval(scanningInterval);
                         scanningInterval = null;
                     }
                     
                     // Stop video stream
                     if (videoStream) {
-                        console.log('Stopping video tracks');
                         videoStream.getTracks().forEach(track => {
-                            console.log('Stopping track:', track.kind);
                             track.stop();
                         });
                         video.srcObject = null;
                         videoStream = null;
                     }
                     
-                    console.log('Scanner stopped');
                 }
                 
                 updateDebugInfo();
@@ -1112,11 +190,8 @@ const htmlContent = `<!DOCTYPE html>
             // QR Code scanning - FIXED VERSION
             function startQRScanning() {
                 if (!scannerActive) {
-                    console.log('Cannot start scanning - scanner not active');
                     return;
                 }
-                
-                console.log('Starting QR scanning...');
                 
                 // Clear any existing interval
                 if (scanningInterval) {
@@ -1134,14 +209,10 @@ const htmlContent = `<!DOCTYPE html>
                 // Start scanning loop
                 scanningInterval = setInterval(() => {
                     if (!scannerActive || !video.videoWidth || !video.videoHeight) {
-                        console.log('Skipping scan - scanner inactive or video not ready');
                         return;
                     }
                     
                     scanCount++;
-                    if (scanCount % 20 === 0) {
-                        console.log('Scanning frame', scanCount, '- Video:', video.videoWidth + 'x' + video.videoHeight);
-                    }
                     
                     // Set canvas dimensions
                     canvas.width = video.videoWidth;
@@ -1160,7 +231,6 @@ const htmlContent = `<!DOCTYPE html>
                         });
                         
                         if (code) {
-                            console.log('QR Code detected! Data:', code.data.substring(0, 50) + (code.data.length > 50 ? '...' : ''));
                             handleQRResult(code.data);
                         }
                     } catch (error) {
@@ -1168,12 +238,10 @@ const htmlContent = `<!DOCTYPE html>
                     }
                 }, 200); // Scan every 200ms (5 times per second)
                 
-                console.log('QR scanning loop started');
             }
             
             // Handle QR result
             async function handleQRResult(data) {
-                console.log('Processing QR result:', data);
                 const resultDiv = document.getElementById('result');
                 
                 try {
@@ -1237,7 +305,6 @@ const htmlContent = `<!DOCTYPE html>
                     showNotification('QR code scanned successfully!', 'success');
                     
                 } catch (error) {
-                    console.error('Error handling QR result:', error);
                     resultDiv.innerHTML = 
                         '<div class="result-header">' +
                             '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>' +
@@ -1347,7 +414,6 @@ const htmlContent = `<!DOCTYPE html>
                     showNotification('QR code generated successfully!', 'success');
                     
                 } catch (error) {
-                    console.error('QR generation error:', error);
                     showNotification('Error generating QR code: ' + error.message, 'error');
                 }
             }
@@ -1386,7 +452,6 @@ const htmlContent = `<!DOCTYPE html>
                         downloadQR();
                     }
                 } catch (error) {
-                    console.error('Share error:', error);
                     downloadQR();
                 }
             }
@@ -1431,7 +496,7 @@ const htmlContent = `<!DOCTYPE html>
                     
                     historyList.innerHTML = historyHTML;
                 } catch (error) {
-                    console.error('Error loading history:', error);
+                    // Silent error
                 }
             }
             
@@ -1491,7 +556,7 @@ const htmlContent = `<!DOCTYPE html>
                     localStorage.setItem('qrossroads_history', JSON.stringify(history));
                     loadHistory();
                 } catch (error) {
-                    console.error('Error saving to history:', error);
+                    // Silent error
                 }
             }
             
@@ -1581,218 +646,13 @@ const htmlContent = `<!DOCTYPE html>
             
             // Add event listener for video errors
             video.addEventListener('error', (e) => {
-                console.error('Video error:', e);
                 updateDebugInfo();
             });
             
             // Add event listener for video playing
             video.addEventListener('playing', () => {
-                console.log('Video is now playing');
                 updateDebugInfo();
             });
             
-            console.log('Qrossroads initialization complete');
         });
     </script>
-</body>
-</html>`;
-
-// Save HTML to public folder
-fs.writeFileSync(path.join(publicDir, 'index.html'), htmlContent);
-console.log('🎨 Qrossroads interface created in public/index.html');
-
-// API Routes
-let scanHistory = [];
-
-// QR Code scanning endpoint
-app.post('/api/scan', (req, res) => {
-    try {
-        const { qrData } = req.body;
-        
-        if (!qrData) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'No QR data provided' 
-            });
-        }
-        
-        // Determine type of QR code
-        let type = 'text';
-        let action = 'copy';
-        
-        if (qrData.startsWith('http://') || qrData.startsWith('https://')) {
-            type = 'url';
-            action = 'open_url';
-        } else if (qrData.startsWith('mailto:')) {
-            type = 'email';
-            action = 'send_email';
-        } else if (qrData.startsWith('tel:')) {
-            type = 'phone';
-            action = 'call';
-        } else if (qrData.startsWith('WIFI:')) {
-            type = 'wifi';
-            action = 'connect_wifi';
-        } else if (qrData.startsWith('BEGIN:VCARD')) {
-            type = 'contact';
-            action = 'save_contact';
-        } else if (qrData.startsWith('SMSTO:') || qrData.startsWith('SMS:')) {
-            type = 'sms';
-            action = 'send_sms';
-        }
-        
-        // Add to history
-        const historyItem = {
-            id: Date.now() + Math.random().toString(36).substr(2, 9),
-            data: qrData,
-            type: type,
-            action: action,
-            timestamp: new Date().toISOString()
-        };
-        
-        scanHistory.unshift(historyItem);
-        scanHistory = scanHistory.slice(0, 100);
-        
-        res.json({ 
-            success: true, 
-            result: historyItem,
-            message: 'Digital path recorded successfully'
-        });
-        
-    } catch (error) {
-        console.error('Scan error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to process digital path' 
-        });
-    }
-});
-
-// QR Code generation endpoint
-app.post('/api/generate', async (req, res) => {
-    try {
-        const { text, size = 400 } = req.body;
-        
-        if (!text || text.trim() === '') {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Content is required to generate QR code' 
-            });
-        }
-        
-        // Generate QR code
-        const qrCode = await QRCode.toDataURL(text, {
-            width: size,
-            margin: 4,
-            color: {
-                dark: '#6d28d9',
-                light: '#FFFFFF'
-            }
-        });
-        
-        res.json({ 
-            success: true, 
-            qrCode: qrCode,
-            text: text,
-            message: 'QR code generated successfully'
-        });
-        
-    } catch (error) {
-        console.error('Generate error:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Failed to generate digital pathway' 
-        });
-    }
-});
-
-// History endpoints
-app.get('/api/history', (req, res) => {
-    res.json({ 
-        success: true, 
-        history: scanHistory,
-        count: scanHistory.length,
-        message: 'Your digital paths retrieved'
-    });
-});
-
-app.delete('/api/history', (req, res) => {
-    scanHistory = [];
-    res.json({ 
-        success: true, 
-        message: 'All digital paths cleared',
-        count: 0 
-    });
-});
-
-// Stats endpoint
-app.get('/api/stats', (req, res) => {
-    const stats = {
-        totalScans: scanHistory.length,
-        byType: scanHistory.reduce((acc, item) => {
-            acc[item.type] = (acc[item.type] || 0) + 1;
-            return acc;
-        }, {}),
-        lastScan: scanHistory[0] ? scanHistory[0].timestamp : null
-    };
-    
-    res.json({ 
-        success: true, 
-        stats: stats,
-        message: 'Qrossroads statistics'
-    });
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'healthy',
-        service: 'Qrossroads',
-        version: '1.0.0',
-        timestamp: new Date().toISOString(),
-        message: 'Where Digital Paths Meet - Running Smoothly'
-    });
-});
-
-// Serve main page
-app.get('/', (req, res) => {
-    res.sendFile(path.join(publicDir, 'index.html'));
-});
-
-// Serve favicon
-app.get('/favicon.ico', (req, res) => {
-    res.status(204).end();
-});
-
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Digital path not found',
-        message: 'The requested pathway does not exist in Qrossroads'
-    });
-});
-
-// Start server
-app.listen(PORT, () => {
-    console.log('⚡══════════════════════════════════════⚡');
-    console.log('           QROSSROADS ACTIVATED          ');
-    console.log('⚡══════════════════════════════════════⚡');
-    console.log('🎨 Style: Green Accent Version');
-    console.log('🌐 Server: http://localhost:' + PORT);
-    console.log('📍 Tagline: Where Digital Paths Meet');
-    console.log('💼 Professional QR Code Hub');
-    console.log('📱 Mobile Ready: Yes (Responsive Design)');
-    console.log('🔒 Features: Scan, Generate, History, Export');
-    console.log('⚡══════════════════════════════════════⚡');
-    console.log('🚀 Ready to launch!');
-    console.log('⚡══════════════════════════════════════⚡');
-});
-
-// Error handling
-process.on('uncaughtException', (err) => {
-    console.error('⚠️ Uncaught Exception:', err.message);
-});
-
-process.on('unhandledRejection', (err) => {
-    console.error('⚠️ Unhandled Rejection:', err.message);
-});
