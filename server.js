@@ -1,4 +1,4 @@
-// server.js - Qrossroads: Complete Working Version with QR Scanner
+// server.js - Qrossroads: COMPLETELY FIXED SCANNER VERSION
 const express = require('express');
 const cors = require('cors');
 const QRCode = require('qrcode');
@@ -20,7 +20,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(publicDir));
 
-// ========== COMPLETE WORKING HTML ==========
+// ========== COMPLETE FIXED HTML ==========
 const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -741,6 +741,52 @@ const htmlContent = `<!DOCTYPE html>
             opacity: 0.7;
             font-size: 0.9rem;
         }
+        
+        /* Scanner status indicator */
+        .scanner-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .scanner-status.active {
+            background: rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulseRed 1.5s infinite;
+        }
+        
+        .status-dot.active {
+            background: #10b981;
+            animation: pulseGreenFast 1s infinite;
+        }
+        
+        @keyframes pulseRed {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        @keyframes pulseGreenFast {
+            0%, 100% { 
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+            50% { 
+                transform: scale(1.2);
+                box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -773,10 +819,17 @@ const htmlContent = `<!DOCTYPE html>
 
             <div id="scan-tab" class="tab-content active">
                 <div class="scanner-container">
+                    <!-- Scanner Status Indicator -->
+                    <div id="scanner-status" class="scanner-status">
+                        <div class="status-dot"></div>
+                        <span>Scanner is stopped</span>
+                    </div>
+                    
                     <div id="video-container">
                         <video id="video" playsinline autoplay muted></video>
                         <div class="scanner-frame"></div>
                     </div>
+                    
                     <div class="btn-group">
                         <button class="btn" id="scanner-btn">
                             <i class="fas fa-camera"></i> Start Scanner
@@ -785,9 +838,18 @@ const htmlContent = `<!DOCTYPE html>
                             <i class="fas fa-upload"></i> Upload Image
                         </button>
                     </div>
+                    
                     <input type="file" id="file-input" accept="image/*" style="display: none;">
                     
+                    <!-- Results Area -->
                     <div id="result" class="result-box"></div>
+                    
+                    <!-- Debug Info (hidden by default) -->
+                    <div id="debug-info" style="display: none; margin-top: 20px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 0.9rem; color: #6b7280;">
+                        <p><strong>Debug Info:</strong></p>
+                        <p id="debug-status">Scanner: Inactive</p>
+                        <p id="debug-video">Video: Not loaded</p>
+                    </div>
                 </div>
             </div>
 
@@ -842,7 +904,7 @@ const htmlContent = `<!DOCTYPE html>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 
     <script>
-        // Qrossroads - SIMPLIFIED WORKING SCANNER VERSION
+        // Qrossroads - COMPLETELY FIXED SCANNER VERSION
         document.addEventListener('DOMContentLoaded', function() {
             console.log('⚡ Qrossroads activated successfully!');
             
@@ -851,6 +913,15 @@ const htmlContent = `<!DOCTYPE html>
             let videoStream = null;
             let currentQRCode = null;
             let scanningInterval = null;
+            
+            // DOM elements
+            const video = document.getElementById('video');
+            const scannerBtn = document.getElementById('scanner-btn');
+            const scannerStatus = document.getElementById('scanner-status');
+            const statusDot = scannerStatus.querySelector('.status-dot');
+            const statusText = scannerStatus.querySelector('span');
+            const debugStatus = document.getElementById('debug-status');
+            const debugVideo = document.getElementById('debug-video');
             
             // Tab switching
             document.querySelectorAll('.tab').forEach(tab => {
@@ -861,7 +932,7 @@ const htmlContent = `<!DOCTYPE html>
             });
             
             // Button event listeners
-            document.getElementById('scanner-btn').addEventListener('click', toggleScanner);
+            scannerBtn.addEventListener('click', toggleScanner);
             document.getElementById('upload-btn').addEventListener('click', uploadQR);
             document.getElementById('generate-btn').addEventListener('click', generateQR);
             document.getElementById('download-btn').addEventListener('click', downloadQR);
@@ -872,6 +943,28 @@ const htmlContent = `<!DOCTYPE html>
             
             // Initialize
             loadHistory();
+            
+            // Update debug info
+            function updateDebugInfo() {
+                if (debugStatus && debugVideo) {
+                    debugStatus.textContent = 'Scanner: ' + (scannerActive ? 'Active' : 'Inactive');
+                    debugVideo.textContent = 'Video: ' + 
+                        (video.videoWidth ? video.videoWidth + 'x' + video.videoHeight : 'Not loaded');
+                }
+            }
+            
+            // Update scanner status UI
+            function updateScannerStatus(active) {
+                if (active) {
+                    scannerStatus.classList.add('active');
+                    statusDot.classList.add('active');
+                    statusText.textContent = 'Scanner is active - Point at QR code';
+                } else {
+                    scannerStatus.classList.remove('active');
+                    statusDot.classList.remove('active');
+                    statusText.textContent = 'Scanner is stopped';
+                }
+            }
             
             // Tab switching function
             function switchTab(tabName) {
@@ -899,16 +992,16 @@ const htmlContent = `<!DOCTYPE html>
                 }
             }
             
-            // Toggle scanner function - SIMPLIFIED AND WORKING
+            // Toggle scanner function - FIXED VERSION
             async function toggleScanner() {
-                const video = document.getElementById('video');
-                const scannerBtn = document.getElementById('scanner-btn');
+                console.log('Toggle scanner called, current state:', scannerActive);
                 
                 if (!scannerActive) {
+                    // START SCANNER
                     try {
                         console.log('Requesting camera access...');
                         
-                        // Request camera access - SIMPLIFIED
+                        // Request camera access
                         videoStream = await navigator.mediaDevices.getUserMedia({ 
                             video: { 
                                 facingMode: 'environment'
@@ -920,53 +1013,88 @@ const htmlContent = `<!DOCTYPE html>
                         // Set video source
                         video.srcObject = videoStream;
                         
-                        // Wait for video to load and play
-                        await new Promise((resolve) => {
+                        // Wait for video to load
+                        await new Promise((resolve, reject) => {
+                            let resolved = false;
+                            
                             video.onloadedmetadata = () => {
                                 console.log('Video metadata loaded');
-                                video.play().then(() => {
-                                    console.log('Video playing');
+                                if (!resolved) {
+                                    resolved = true;
                                     resolve();
-                                }).catch(error => {
-                                    console.error('Video play error:', error);
-                                    resolve();
-                                });
+                                }
+                            };
+                            
+                            video.onerror = (error) => {
+                                console.error('Video error:', error);
+                                if (!resolved) {
+                                    resolved = true;
+                                    reject(new Error('Video failed to load'));
+                                }
                             };
                             
                             // Fallback timeout
-                            setTimeout(resolve, 1000);
+                            setTimeout(() => {
+                                if (!resolved) {
+                                    console.log('Video load timeout');
+                                    resolved = true;
+                                    resolve();
+                                }
+                            }, 3000);
                         });
                         
-                        // Update UI
+                        // Try to play video
+                        try {
+                            await video.play();
+                            console.log('Video playing successfully');
+                        } catch (playError) {
+                            console.warn('Video play error:', playError);
+                            // Continue anyway
+                        }
+                        
+                        // Update UI state
                         scannerActive = true;
                         scannerBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Scanner';
+                        updateScannerStatus(true);
+                        
+                        // Clear any previous results
                         document.getElementById('result').innerHTML = '';
                         
-                        // Start QR scanning
-                        startQRScanning();
+                        // Start scanning after a short delay to ensure video is ready
+                        setTimeout(() => {
+                            if (scannerActive) {
+                                startQRScanning();
+                                console.log('QR scanning started');
+                            }
+                        }, 500);
                         
-                        showNotification('Scanner activated! Point at a QR code', 'success');
+                        showNotification('Scanner activated! Point camera at QR code', 'success');
                         
                     } catch (error) {
                         console.error('Camera access error:', error);
                         showNotification('Camera error: ' + error.message, 'error');
                         scannerActive = false;
                         scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
+                        updateScannerStatus(false);
                     }
                 } else {
-                    // Stop scanner
+                    // STOP SCANNER
                     console.log('Stopping scanner...');
+                    
                     scannerActive = false;
                     scannerBtn.innerHTML = '<i class="fas fa-camera"></i> Start Scanner';
+                    updateScannerStatus(false);
                     
                     // Clear scanning interval
                     if (scanningInterval) {
+                        console.log('Clearing scanning interval');
                         clearInterval(scanningInterval);
                         scanningInterval = null;
                     }
                     
                     // Stop video stream
                     if (videoStream) {
+                        console.log('Stopping video tracks');
                         videoStream.getTracks().forEach(track => {
                             console.log('Stopping track:', track.kind);
                             track.stop();
@@ -974,154 +1102,151 @@ const htmlContent = `<!DOCTYPE html>
                         video.srcObject = null;
                         videoStream = null;
                     }
+                    
+                    console.log('Scanner stopped');
                 }
+                
+                updateDebugInfo();
             }
             
-            // QR Code scanning - SIMPLIFIED AND WORKING
+            // QR Code scanning - FIXED VERSION
             function startQRScanning() {
-                if (!scannerActive) return;
+                if (!scannerActive) {
+                    console.log('Cannot start scanning - scanner not active');
+                    return;
+                }
                 
-                const video = document.getElementById('video');
+                console.log('Starting QR scanning...');
                 
                 // Clear any existing interval
                 if (scanningInterval) {
                     clearInterval(scanningInterval);
                 }
                 
-                console.log('Starting QR scanning...');
-                
-                // Create canvas once
+                // Create canvas for processing
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d', {
-                    willReadFrequently: true // Fixes performance warning
+                    willReadFrequently: true
                 });
+                
+                let scanCount = 0;
                 
                 // Start scanning loop
                 scanningInterval = setInterval(() => {
                     if (!scannerActive || !video.videoWidth || !video.videoHeight) {
+                        console.log('Skipping scan - scanner inactive or video not ready');
                         return;
                     }
                     
-                    // Set canvas dimensions to match video
+                    scanCount++;
+                    if (scanCount % 20 === 0) {
+                        console.log('Scanning frame', scanCount, '- Video:', video.videoWidth + 'x' + video.videoHeight);
+                    }
+                    
+                    // Set canvas dimensions
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
-                    // Draw current video frame to canvas
+                    // Draw video frame to canvas
                     context.drawImage(video, 0, 0, canvas.width, canvas.height);
                     
-                    // Get image data from canvas
+                    // Get image data
                     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                     
                     try {
-                        // Use jsQR to decode QR code
+                        // Try to decode QR code
                         const code = jsQR(imageData.data, imageData.width, imageData.height, {
                             inversionAttempts: 'dontInvert',
                         });
                         
                         if (code) {
-                            console.log('QR Code detected:', code.data);
+                            console.log('QR Code detected! Data:', code.data.substring(0, 50) + (code.data.length > 50 ? '...' : ''));
                             handleQRResult(code.data);
-                            
-                            // Optional: Stop scanning after successful detection
-                            // toggleScanner();
                         }
                     } catch (error) {
-                        // Silent fail - this is normal when no QR code is found
+                        // Silent fail - normal when no QR code found
                     }
-                }, 250); // Scan every 250ms
+                }, 200); // Scan every 200ms (5 times per second)
+                
+                console.log('QR scanning loop started');
             }
             
-            // Handle QR result - SIMPLIFIED
+            // Handle QR result
             async function handleQRResult(data) {
+                console.log('Processing QR result:', data);
                 const resultDiv = document.getElementById('result');
                 
-                console.log('Processing QR result:', data);
-                
                 try {
-                    // For demo, simulate server response
-                    // In production, uncomment the fetch call
-                    
-                    // const response = await fetch('/api/scan', {
-                    //     method: 'POST',
-                    //     headers: { 'Content-Type': 'application/json' },
-                    //     body: JSON.stringify({ qrData: data })
-                    // });
-                    // const result = await response.json();
-                    
-                    // Simulated response for testing
-                    const simulatedResult = {
-                        success: true,
-                        result: {
-                            data: data,
-                            type: determineQRType(data),
-                            timestamp: new Date().toISOString()
-                        }
-                    };
-                    
-                    const result = simulatedResult; // Replace with actual fetch result
-                    
-                    if (result.success) {
-                        const qrData = result.result.data;
-                        const qrType = result.result.type;
-                        
-                        // Create actions based on QR type
-                        let actions = '';
-                        
-                        if (qrType === 'url') {
-                            actions = '<button class="btn" onclick="window.open(\\'' + escapeSingleQuotes(qrData) + '\\', \\'_blank\\')"><i class="fas fa-external-link-alt"></i> Open Link</button>';
-                        } else if (qrType === 'email') {
-                            actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(qrData) + '\\'"><i class="fas fa-envelope"></i> Send Email</button>';
-                        } else if (qrType === 'phone') {
-                            actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(qrData) + '\\'"><i class="fas fa-phone"></i> Call Number</button>';
-                        }
-                        
-                        // Display results
-                        resultDiv.innerHTML = '<div class="result-header">' +
-                            '<i class="fas fa-check-circle" style="color: #10b981;"></i>' +
-                            '<h3 style="margin: 0;">QR Code Scanned!</h3>' +
-                            '</div>' +
-                            '<div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">' +
-                            '<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">' +
-                            '<span class="history-type" style="background: ' + getTypeColor(qrType) + '">' + qrType.toUpperCase() + '</span>' +
-                            '<span style="color: #6b7280; font-size: 0.9rem;">' +
-                            new Date().toLocaleTimeString() +
-                            '</span>' +
-                            '</div>' +
-                            '<div style="font-size: 1.1rem; word-break: break-all; padding: 10px; background: #f8fafc; border-radius: 5px;">' +
-                            escapeHtml(qrData) +
-                            '</div>' +
-                            '</div>' +
-                            '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">' +
-                            actions +
-                            '<button class="btn" onclick="copyToClipboard(\\'' + escapeSingleQuotes(qrData) + '\\')">' +
-                            '<i class="fas fa-copy"></i> Copy' +
-                            '</button>' +
-                            '<button class="btn" onclick="toggleScanner()">' +
-                            '<i class="fas fa-redo"></i> Scan Another' +
-                            '</button>' +
-                            '</div>';
-                        
-                        resultDiv.classList.add('show');
-                        
-                        // Save to history
-                        saveToHistory(qrData, qrType);
-                        
-                        showNotification('QR code scanned successfully!', 'success');
-                        
-                        // Stop scanner after successful scan
+                    // Stop scanner first
+                    if (scannerActive) {
                         toggleScanner();
                     }
-                } catch (error) {
-                    console.error('Error handling QR result:', error);
-                    resultDiv.innerHTML = '<div class="result-header">' +
-                        '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>' +
-                        '<h3 style="margin: 0;">Scan Error</h3>' +
+                    
+                    // Determine QR type
+                    const qrType = determineQRType(data);
+                    
+                    // Create appropriate actions
+                    let actions = '';
+                    
+                    if (qrType === 'url') {
+                        actions = '<button class="btn" onclick="window.open(\\'' + escapeSingleQuotes(data) + '\\', \\'_blank\\')">' +
+                                  '<i class="fas fa-external-link-alt"></i> Open Link' +
+                                  '</button>';
+                    } else if (qrType === 'email') {
+                        actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(data) + '\\'">' +
+                                  '<i class="fas fa-envelope"></i> Send Email' +
+                                  '</button>';
+                    } else if (qrType === 'phone') {
+                        actions = '<button class="btn" onclick="location.href=\\'' + escapeSingleQuotes(data) + '\\'">' +
+                                  '<i class="fas fa-phone"></i> Call Number' +
+                                  '</button>';
+                    }
+                    
+                    // Display results
+                    resultDiv.innerHTML = 
+                        '<div class="result-header">' +
+                            '<i class="fas fa-check-circle" style="color: #10b981;"></i>' +
+                            '<h3 style="margin: 0;">QR Code Scanned Successfully!</h3>' +
                         '</div>' +
                         '<div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">' +
-                        'Error: ' + error.message +
+                            '<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">' +
+                                '<span class="history-type" style="background: ' + getTypeColor(qrType) + '">' + qrType.toUpperCase() + '</span>' +
+                                '<span style="color: #6b7280; font-size: 0.9rem;">' +
+                                    new Date().toLocaleTimeString() +
+                                '</span>' +
+                            '</div>' +
+                            '<div style="font-size: 1.1rem; word-break: break-all; padding: 10px; background: #f8fafc; border-radius: 5px;">' +
+                                escapeHtml(data) +
+                            '</div>' +
+                        '</div>' +
+                        '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">' +
+                            actions +
+                            '<button class="btn" onclick="copyToClipboard(\\'' + escapeSingleQuotes(data) + '\\')">' +
+                                '<i class="fas fa-copy"></i> Copy' +
+                            '</button>' +
+                            '<button class="btn" onclick="toggleScanner()">' +
+                                '<i class="fas fa-redo"></i> Scan Another' +
+                            '</button>' +
+                        '</div>';
+                    
+                    resultDiv.classList.add('show');
+                    
+                    // Save to history
+                    saveToHistory(data, qrType);
+                    
+                    showNotification('QR code scanned successfully!', 'success');
+                    
+                } catch (error) {
+                    console.error('Error handling QR result:', error);
+                    resultDiv.innerHTML = 
+                        '<div class="result-header">' +
+                            '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>' +
+                            '<h3 style="margin: 0;">Error Processing QR Code</h3>' +
+                        '</div>' +
+                        '<div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">' +
+                            '<p>Error: ' + error.message + '</p>' +
                         '</div>';
                     resultDiv.classList.add('show');
-                    showNotification('Scan failed: ' + error.message, 'error');
                 }
             }
             
@@ -1137,8 +1262,6 @@ const htmlContent = `<!DOCTYPE html>
                     return 'wifi';
                 } else if (data.startsWith('BEGIN:VCARD')) {
                     return 'contact';
-                } else if (data.startsWith('SMSTO:') || data.startsWith('SMS:')) {
-                    return 'sms';
                 } else if (data.includes('@') && data.includes('.')) {
                     return 'email';
                 }
@@ -1191,7 +1314,6 @@ const htmlContent = `<!DOCTYPE html>
                 }
                 
                 try {
-                    // Use client-side QR generation
                     const qrCodeDataURL = await new Promise((resolve, reject) => {
                         QRCode.toDataURL(text, {
                             width: 300,
@@ -1208,18 +1330,20 @@ const htmlContent = `<!DOCTYPE html>
                     });
                     
                     const container = document.getElementById('qr-image-container');
-                    container.innerHTML = '<div class="qr-preview">' +
-                        '<img src="' + qrCodeDataURL + '" alt="Generated QR Code" style="width: 100%; border-radius: 8px;">' +
-                        '<p style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">' +
-                        'Scan this QR code to access: <br>' +
-                        '<strong>' + escapeHtml(text.length > 50 ? text.substring(0, 50) + '...' : text) + '</strong>' +
-                        '</p>' +
+                    container.innerHTML = 
+                        '<div class="qr-preview">' +
+                            '<img src="' + qrCodeDataURL + '" alt="Generated QR Code" style="width: 100%; border-radius: 8px;">' +
+                            '<p style="margin-top: 10px; color: #6b7280; font-size: 0.9rem;">' +
+                                'Scan this QR code to access: <br>' +
+                                '<strong>' + escapeHtml(text.length > 50 ? text.substring(0, 50) + '...' : text) + '</strong>' +
+                            '</p>' +
                         '</div>';
                     
                     document.getElementById('qr-result').classList.add('show');
                     document.getElementById('download-btn').style.display = 'inline-block';
                     document.getElementById('share-btn').style.display = 'inline-block';
                     currentQRCode = { image: qrCodeDataURL, text: text };
+                    
                     showNotification('QR code generated successfully!', 'success');
                     
                 } catch (error) {
@@ -1259,12 +1383,11 @@ const htmlContent = `<!DOCTYPE html>
                         });
                         showNotification('QR code shared successfully!', 'success');
                     } else {
-                        // Fallback to download
                         downloadQR();
                     }
                 } catch (error) {
                     console.error('Share error:', error);
-                    downloadQR(); // Fallback
+                    downloadQR();
                 }
             }
             
@@ -1275,32 +1398,34 @@ const htmlContent = `<!DOCTYPE html>
                     const historyList = document.getElementById('history-list');
                     
                     if (history.length === 0) {
-                        historyList.innerHTML = '<div style="text-align: center; padding: 40px; color: #6b7280;">' +
-                            '<i class="fas fa-road fa-3x" style="margin-bottom: 20px; opacity: 0.5;"></i>' +
-                            '<h4>No Digital Paths Yet</h4>' +
-                            '<p>Start scanning QR codes to build your digital path history.</p>' +
+                        historyList.innerHTML = 
+                            '<div style="text-align: center; padding: 40px; color: #6b7280;">' +
+                                '<i class="fas fa-road fa-3x" style="margin-bottom: 20px; opacity: 0.5;"></i>' +
+                                '<h4>No Digital Paths Yet</h4>' +
+                                '<p>Start scanning QR codes to build your digital path history.</p>' +
                             '</div>';
                         return;
                     }
                     
                     let historyHTML = '';
                     history.forEach(item => {
-                        historyHTML += '<div class="history-item">' +
-                            '<div style="flex: 1;">' +
-                            '<div>' +
-                            '<span class="history-type" style="background: ' + getTypeColor(item.type) + '">' + item.type.toUpperCase() + '</span>' +
-                            '<strong>' + escapeHtml(item.data.length > 60 ? item.data.substring(0, 60) + '...' : item.data) + '</strong>' +
-                            '</div>' +
-                            '<div class="history-time">' +
-                            '<i class="far fa-clock"></i>' +
-                            new Date(item.timestamp).toLocaleString() +
-                            '</div>' +
-                            '</div>' +
-                            '<div style="display: flex; gap: 8px;">' +
-                            '<button class="btn" style="padding: 8px 16px; font-size: 0.9rem;" onclick="copyToClipboard(\\'' + escapeSingleQuotes(item.data) + '\\')">' +
-                            '<i class="fas fa-copy"></i>' +
-                            '</button>' +
-                            '</div>' +
+                        historyHTML += 
+                            '<div class="history-item">' +
+                                '<div style="flex: 1;">' +
+                                    '<div>' +
+                                        '<span class="history-type" style="background: ' + getTypeColor(item.type) + '">' + item.type.toUpperCase() + '</span>' +
+                                        '<strong>' + escapeHtml(item.data.length > 60 ? item.data.substring(0, 60) + '...' : item.data) + '</strong>' +
+                                    '</div>' +
+                                    '<div class="history-time">' +
+                                        '<i class="far fa-clock"></i>' +
+                                        new Date(item.timestamp).toLocaleString() +
+                                    '</div>' +
+                                '</div>' +
+                                '<div style="display: flex; gap: 8px;">' +
+                                    '<button class="btn" style="padding: 8px 16px; font-size: 0.9rem;" onclick="copyToClipboard(\\'' + escapeSingleQuotes(item.data) + '\\')">' +
+                                        '<i class="fas fa-copy"></i>' +
+                                    '</button>' +
+                                '</div>' +
                             '</div>';
                     });
                     
@@ -1379,20 +1504,32 @@ const htmlContent = `<!DOCTYPE html>
             
             function showNotification(message, type = 'info') {
                 const notification = document.createElement('div');
-                notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: ' + 
+                notification.style.cssText = 
+                    'position: fixed; top: 20px; right: 20px; background: ' + 
                     (type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#6d28d9') + 
-                    '; color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; animation: fadeInUp 0.3s ease;';
+                    '; color: white; padding: 15px 25px; border-radius: 12px; ' +
+                    'box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 10000; ' +
+                    'animation: fadeInUp 0.3s ease; font-family: inherit;';
                 
-                notification.innerHTML = '<div style="display: flex; align-items: center; gap: 10px;">' +
-                    '<i class="fas ' + (type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle') + '"></i>' +
-                    '<span>' + message + '</span>' +
+                notification.innerHTML = 
+                    '<div style="display: flex; align-items: center; gap: 10px;">' +
+                        '<i class="fas ' + 
+                        (type === 'success' ? 'fa-check-circle' : 
+                         type === 'error' ? 'fa-exclamation-circle' : 
+                         type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle') + 
+                        '"></i>' +
+                        '<span>' + message + '</span>' +
                     '</div>';
                 
                 document.body.appendChild(notification);
                 
                 setTimeout(() => {
                     notification.style.animation = 'fadeOut 0.3s ease';
-                    setTimeout(() => notification.remove(), 300);
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
                 }, 3000);
             }
             
@@ -1413,8 +1550,7 @@ const htmlContent = `<!DOCTYPE html>
                     'phone': '#10b981',
                     'wifi': '#f59e0b',
                     'text': '#6b7280',
-                    'contact': '#ec4899',
-                    'sms': '#06b6d4'
+                    'contact': '#ec4899'
                 };
                 return colors[type] || '#6d28d9';
             }
@@ -1432,9 +1568,28 @@ const htmlContent = `<!DOCTYPE html>
             
             // Add animation styles
             const style = document.createElement('style');
-            style.textContent = '@keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } } ' +
-                               '@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }';
+            style.textContent = 
+                '@keyframes fadeOut { ' +
+                '  from { opacity: 1; transform: translateY(0); } ' +
+                '  to { opacity: 0; transform: translateY(-10px); } ' +
+                '} ' +
+                '@keyframes fadeInUp { ' +
+                '  from { opacity: 0; transform: translateY(20px); } ' +
+                '  to { opacity: 1; transform: translateY(0); } ' +
+                '}';
             document.head.appendChild(style);
+            
+            // Add event listener for video errors
+            video.addEventListener('error', (e) => {
+                console.error('Video error:', e);
+                updateDebugInfo();
+            });
+            
+            // Add event listener for video playing
+            video.addEventListener('playing', () => {
+                console.log('Video is now playing');
+                updateDebugInfo();
+            });
             
             console.log('Qrossroads initialization complete');
         });
