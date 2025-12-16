@@ -11,8 +11,9 @@
   "author": "QR Scanner Pro",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
+    "canvas": "^3.2.0",
     "cors": "^2.8.5",
-    "qrcode": "^1.5.3"
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4"
   }
 }
